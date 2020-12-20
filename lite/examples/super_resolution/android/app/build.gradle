@@ -57,6 +57,7 @@ android {
             version "3.6.0"
         }
     }
+    ndkVersion '21.3.6528147'
 }
 
 // import download tasks
