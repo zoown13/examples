@@ -16,14 +16,24 @@
 
 package org.tensorflow.lite.examples.superresolution;
 
+import android.Manifest;
+import android.app.Activity;
+import android.app.ProgressDialog;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import androidx.appcompat.app.AppCompatActivity;
+
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -34,11 +44,18 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.WorkerThread;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
+import com.google.common.primitives.Ints;
+
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
 
 /** A super resolution class to generate super resolution images from low resolution images * */
 public class MainActivity extends AppCompatActivity {
@@ -57,6 +74,8 @@ public class MainActivity extends AppCompatActivity {
   private static final String LR_IMG_2 = "lr-2.jpg";
   private static final String LR_IMG_3 = "lr-3.jpg";
 
+  private int lr_height = 0;
+
   private MappedByteBuffer model;
   private long superResolutionNativeHandle = 0;
   private Bitmap selectedLRBitmap = null;
@@ -68,12 +87,21 @@ public class MainActivity extends AppCompatActivity {
   private TextView selectedImageTextView;
   private Switch gpuSwitch;
 
+  /**
+   * Values for ImgUpload
+   */
+  final int REQ_CODE_SELECT_IMAGE=100;
+  Activity activity;
+  ////////////////////////////////////
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
+    activity = this;
 
     final Button superResolutionButton = findViewById(R.id.upsample_button);
+    final Button imageSelectButton = findViewById(R.id.image_select);
     lowResImageView1 = findViewById(R.id.low_resolution_image_1);
     lowResImageView2 = findViewById(R.id.low_resolution_image_2);
     lowResImageView3 = findViewById(R.id.low_resolution_image_3);
@@ -102,6 +130,18 @@ public class MainActivity extends AppCompatActivity {
     for (ImageView iv : lowResImageViews) {
       setLRImageViewListener(iv);
     }
+
+    imageSelectButton.setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        Intent intent = new Intent();
+        intent.setType("image/*");
+        intent.setAction(Intent.ACTION_GET_CONTENT);
+        startActivityForResult(intent, REQ_CODE_SELECT_IMAGE);
+      }
+    });
+
+
 
     superResolutionButton.setOnClickListener(
         new View.OnClickListener() {
@@ -229,6 +269,24 @@ public class MainActivity extends AppCompatActivity {
   private void deinit() {
     deinitFromJNI(superResolutionNativeHandle);
   }
+
+  @Override
+  protected void onActivityResult(int requestCode, int resultCode, Intent data)
+  {
+    super.onActivityResult(requestCode, resultCode, data);
+    if (requestCode == REQ_CODE_SELECT_IMAGE && resultCode == RESULT_OK && data != null && data.getData() != null) {
+
+      Uri uri = data.getData();
+
+      try {
+        selectedLRBitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), uri);
+        selectedLRBitmap = Bitmap.createScaledBitmap(selectedLRBitmap,50,50,true);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+  }
+
 
   private native int[] superResolutionFromJNI(long superResolutionNativeHandle, int[] lowResRGB);
 
